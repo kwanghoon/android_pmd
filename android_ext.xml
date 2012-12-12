@@ -1,0 +1,167 @@
+
+<ruleset xmlns="http://pmd.sourceforge.net/ruleset/2.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" name="Android" xsi:schemaLocation="http://pmd.sourceforge.net/ruleset/2.0.0 http://pmd.sourceforge.net/ruleset_2_0_0.xsd">
+<description>
+These rules deal with the Android SDK, mostly related to best practices. To get better results, make sure that the auxclasspath is defined for type resolution to work.
+</description>
+
+<rule  name="NoURLopenStreamInActivity"
+  language="java"
+  message="No call to URL.openStream in any methods of Activity is allowed in Android 4.0 or higher due to the strict mode."
+  class="net.sourceforge.pmd.lang.rule.XPathRule">
+  <description>
+  No call to URL.openStream in Activity
+  </description>
+  <properties>
+    <property name="xpath">
+    <value>
+<![CDATA[
+ //ClassOrInterfaceDeclaration
+   [//ClassOrInterfaceType[@Image="Activity"]]
+       //MethodDeclaration[MethodDeclarator[
+            @Image="onCreate" or
+            @Image="onRestart" or
+            @Image="onStart"]]
+ 
+          [//PrimaryPrefix/Name[
+                    substring(@Image, 
+	  string-length(@Image)-string-length("openStream")+1,
+                      string-length(@Image))="openStream"
+	] and
+           //ClassOrInterfaceType[@Image="URL" or @Image="java.net.URL"]
+          ]
+
+]]>
+    </value>
+    </property>
+  </properties>
+  <priority>3</priority>
+  <example>
+<![CDATA[
+package edu.yonsei.exercise;
+
+import java.net.URL;
+import java.util.ArrayList;
+
+import android.app.Activity;
+import android.app.ListActivity;
+import android.os.Bundle;
+import android.util.Log;
+import android.view.LayoutInflater;
+import android.view.View;
+import android.view.ViewGroup;
+import android.widget.ArrayAdapter;
+import android.widget.TextView;
+
+import org.xmlpull.v1.XmlPullParser;
+import org.xmlpull.v1.XmlPullParserFactory;
+
+public class PullParserTest extends ListActivity {
+	final private String TAG = "PullParserTestActivity";		
+	ArrayList<Weather> weather = new ArrayList<Weather>();
+
+    /** Called when the activity is first created. */
+    @Override
+    public void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.main);
+        
+		
+		try {
+			URL url = new URL("http://www.kma.go.kr/XML/weather/sfc_web_map.xml");
+			XmlPullParserFactory parserFactory = XmlPullParserFactory.newInstance();
+			XmlPullParser parser = parserFactory.newPullParser();
+			parser.setInput(url.openStream(), "utf-8");
+			
+			int parserEvent = parser.getEventType();
+			String stnid = "";
+			String desc = "";
+			String ta = "";
+			String region = "";
+			
+			String name = "";
+			while (parserEvent != XmlPullParser.END_DOCUMENT) {
+				switch(parserEvent) {
+				case XmlPullParser.START_DOCUMENT:
+					Log.d(TAG, "Parser Start..!");
+					break;
+				case XmlPullParser.START_TAG:
+					name = parser.getName();
+					if (name != null && name.equals("local")) {
+						stnid = parser.getAttributeValue(null, "stn_id");
+						desc = parser.getAttributeValue(null, "desc");
+						ta = parser.getAttributeValue(null, "ta");
+					}
+					break;
+				case XmlPullParser.TEXT:
+					if (name != null && name.equals("local")) {
+						region = parser.getText();
+						Log.i("PullParserTest", region);
+					}
+					break;
+				case XmlPullParser.END_TAG:
+					if (name != null && name.equals("local")) {
+						Weather w = new Weather(region, desc, ta, stnid);
+						Log.i("PullParserTest", w.toString());
+						weather.add(w);
+					}
+					name = "";
+					break;
+				}
+				parserEvent = parser.next();
+			}
+		}
+		catch(Exception e) {
+			e.printStackTrace();
+			Log.d(TAG, "error");
+		}
+		
+		setListAdapter(new CustomRow(this));
+    }
+    
+    class Weather {
+    	String region;
+    	String desc;
+    	String ta;
+    	String stnid;
+    	
+    	public Weather(String region, String desc, String ta, String stnid) {
+    		this.region = region;
+    		this.desc = desc;
+    		this.ta = ta;
+    		this.stnid = stnid;
+    	}
+    	
+    	public String toString() {
+    		return this.region + "," + this.desc +"," + this.ta + "," + this.stnid;
+    	}
+    }
+
+    class CustomRow extends ArrayAdapter<Weather> {
+    	Activity context;
+    	public CustomRow(Activity c) {
+    		super(c, R.layout.customcell, weather);
+    		this.context = c;
+    	}
+    	
+    	@Override
+    	public View getView(int position, View v, ViewGroup vg) {
+    		LayoutInflater inf = context.getLayoutInflater();
+    		View customcell = inf.inflate(R.layout.customcell, null);
+
+    		TextView regionTextView = (TextView)customcell.findViewById(R.id.textView1);
+    		TextView conditionTextView = (TextView)customcell.findViewById(R.id.textView2);
+    		
+    		regionTextView.setText(weather.get(position).region);
+    		conditionTextView.setText(weather.get(position).desc);
+    		
+    		return customcell;
+    	}
+    }
+}
+
+
+]]>
+  </example>
+</rule>
+
+</ruleset>
